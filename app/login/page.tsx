@@ -1,4 +1,5 @@
-"use client"
+"use client";  
+
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -16,27 +17,30 @@ const LoginPage: React.FC = () => {
     console.log("Logging in as User");
 
     try {
-      const result = await axios.post("http://localhost:3001/LoginUser", {
+      const result = await axios.post("http://localhost:3001/api/auth/login", {
         email,
         password,
       });
       console.log("Response data:", result.data);
 
-      if (result.data.success) {
+      const { token, refreshToken } = result.data;
+
+      if (token && refreshToken) {
         toast.success("Login successful!", {
           autoClose: 3000,
         });
-        localStorage.setItem("userName", result.data.user);
-        router.push(`/UserPage/${result.data.user}`);
+        localStorage.setItem("authToken", token);
+        localStorage.setItem("refreshToken", refreshToken);
+        localStorage.setItem("userName", email); 
+        router.push(`/UserPage/${email}`);
       } else {
-        toast.error("Login failed: " + result.data.message, {
+        toast.error("Login failed: Invalid response", {
           autoClose: 3000,
         });
       }
     } catch (err) {
       console.error("Error in login request:", err);
       toast.error("An error occurred during login.", {
-        position: toast.POSITION.TOP_RIGHT,
         autoClose: 3000,
       });
     }

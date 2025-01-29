@@ -10,19 +10,23 @@ const SignUpPage: React.FC = () => {
   const [name, setName] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
-  const router = useRouter(); // Use Next.js router
+  const router = useRouter(); 
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     try {
-      const result = await axios.post("http://localhost:3001/RegUser", {
+      if (!/(?=.*[A-Z])(?=.*[\W_]).{6,}/.test(password)) {
+        toast.error("Password must contain at least one uppercase letter and one special character", { autoClose: 3000 });
+        return;
+      }      
+      const result = await axios.post(`http://localhost:3001/api/auth/register`, {
         name,
         email,
         password,
       });
       if (result.data.success) {
-        toast.success("Registration successful!", { autoClose: 3000 });
-        router.push("/login"); // Redirect using Next.js router
+        toast.success(result.data.message, { autoClose: 3000 });
+        router.push("/login"); 
       } else {
         toast.error("Registration failed: " + result.data.message, {
           autoClose: 3000,
