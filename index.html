@@ -145,7 +145,7 @@
             try {
                 // Get location coordinates
                 const [location, days] = parseInput(input);
-                const geoResponse = await fetch('http://localhost:5000/geocode', {
+                const geoResponse = await fetch('http://192.168.132.77:5000/geocode', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ location })
@@ -159,7 +159,7 @@
                 addMarker(geoData.lat, geoData.lon, geoData.formatted, 'Your Destination');
                 
                 // Get points of interest
-                const poiResponse = await fetch('http://localhost:5000/poi', {
+                const poiResponse = await fetch('http://192.168.132.77:5000/poi', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ lat: geoData.lat, lon: geoData.lon })
@@ -176,7 +176,7 @@
                 const [location, days] = parseInput(input);
                 
                 // Call backend
-                const response = await fetch('http://localhost:5000/generate', {
+                const response = await fetch('http://192.168.132.77:5000/generate', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
