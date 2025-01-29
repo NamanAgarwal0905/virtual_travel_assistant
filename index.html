@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Trip Planner</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+            height: 100vh;
+            padding: 20px;
+        }
+
+        .chat-section {
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+
+        .message {
+            margin: 10px 0;
+            padding: 8px 12px;
+            border-radius: 15px;
+            max-width: 80%;
+        }
+
+        .user-message {
+            background: #007bff;
+            color: white;
+            margin-left: auto;
+        }
+
+        .bot-message {
+            background: #e9ecef;
+            margin-right: auto;
+        }
+
+        #map {
+            height: 100%;
+            border-radius: 10px;
+        }
+
+        .itinerary-section {
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .itinerary-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 5px;
+            cursor: move;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        input {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        button {
+            padding: 8px 15px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .loading {
+            display: none;
+            color: #666;
+            font-style: italic;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chat-section">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message bot-message">Where would you like to go? Example: "3 days in Rome with historical sites"</div>
+            </div>
+            <div class="input-group">
+                <input type="text" id="userInput" placeholder="Enter your trip request...">
+                <button onclick="generateItinerary()">Plan Trip</button>
+            </div>
+            <div class="loading" id="loading">Generating your perfect itinerary...</div>
+            <div class="error" id="error"></div>
+        </div>
+        
+        <div id="map"></div>
+        
+        <div class="itinerary-section">
+            <h3>Your Itinerary</h3>
+            <div id="itineraryList"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        let map;
+        let markers = [];
+        function initMap(lat=19.0760, lon=72.8777) { // Default to Mumbai
+            if(map) map.remove();
+            map = L.map('map').setView([lat, lon], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        }
+        function addMarker(lat, lng, title, description) {
+            const marker = L.marker([lat, lng]).addTo(map);
+            marker.bindPopup(`
+                <b>${title}</b><br>
+                ${description}
+            `);
+            markers.push(marker);
+        }
+
+        async function generateItinerary() {
+            const input = document.getElementById('userInput').value.trim();
+            if (!input) return;
+        
+            showLoading(true);
+            clearError();
+            clearMapMarkers();
+        
+            try {
+                // Get location coordinates
+                const [location, days] = parseInput(input);
+                const geoResponse = await fetch('http://localhost:5000/geocode', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ location })
+                });
+                
+                const geoData = await geoResponse.json();
+                if (geoData.error) throw new Error(geoData.error);
+                
+                // Update map view with formatted name
+                initMap(geoData.lat, geoData.lon);
+                addMarker(geoData.lat, geoData.lon, geoData.formatted, 'Your Destination');
+                
+                // Get points of interest
+                const poiResponse = await fetch('http://localhost:5000/poi', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ lat: geoData.lat, lon: geoData.lon })
+                });
+                
+                const poiData = await poiResponse.json();
+                if (poiData.error) throw new Error(poiData.error);
+                
+                // Add markers to map
+                addMapMarkers(poiData);
+
+                try {
+                // Parse input
+                const [location, days] = parseInput(input);
+                
+                // Call backend
+                const response = await fetch('http://localhost:5000/generate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        location: location,
+                        days: days || 3,
+                        interests: extractInterests(input)
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.status === 'error') throw new Error(data.error);
+                
+                updateItinerary(data.itinerary);
+                addMessage(input, 'user');
+                addMessage("Here's your personalized itinerary!", 'bot');
+                
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                showLoading(false);
+            }
+                
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+        function addMapMarkers(poiData) {
+            poiData.forEach(poi => {
+                const marker = L.marker([
+                    poi.lat || poi.center.lat,
+                    poi.lon || poi.center.lon
+                ]).addTo(map);
+                
+                marker.bindPopup(`
+                    <b>${poi.tags.name || 'Unnamed Point'}</b><br>
+                    ${poi.tags.tourism || 'Attraction'}<br>
+                    ${poi.tags.wikipedia ? `<a href="https://en.wikipedia.org/wiki/${poi.tags.wikipedia}" target="_blank">Wikipedia</a>` : ''}
+                `);
+                
+                markers.push(marker);
+            });
+        }
+        
+        function clearMapMarkers() {
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+        }
+        function parseInput(text) {
+            // Case-insensitive match with multiple possible phrasings
+            const match = text.match(
+                /(?:plan\s*a\s*trip\s*)?(?:for\s*)?(\d+)?\s*(?:days?|day)?\s*(?:in|to|at|for)\s*([^0-9]+?)(?:\s*with\s*(.*))?$/i
+            );
+            
+            let location = match?.[2]?.trim() || 'Unknown Location';
+            // Clean up leftover prepositions
+            location = location.replace(/^\s*(?:to|in|at|for)\s*/i, '');
+            
+            const days = match?.[1] ? parseInt(match[1]) : 3;
+            
+            return [location, days];
+        }
+        
+        function extractInterests(text) {
+            // Capture everything after "with", "focusing on", or "including"
+            const interestMatch = text.match(/(?:with|focusing on|including)\s*(.*)$/i);
+            return interestMatch ? interestMatch[1].trim() : 'general sightseeing';
+        }
+
+        function updateItinerary(itineraryText) {
+            const itineraryList = document.getElementById('itineraryList');
+            itineraryList.innerHTML = itineraryText
+                .split('\n')
+                .map(line => {
+                    if (line.startsWith('Day')) {
+                        return `<div class="itinerary-item">${line}</div>`;
+                    }
+                    return `<div class="itinerary-detail">${line}</div>`;
+                })
+                .join('');
+        }
+
+        // Helper functions
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function showError(message) {
+            document.getElementById('error').textContent = message;
+        }
+
+        function clearError() {
+            document.getElementById('error').textContent = '';
+        }
+
+        function addMessage(text, sender) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        initMap();
+    </script>
+</body>
+</html>
