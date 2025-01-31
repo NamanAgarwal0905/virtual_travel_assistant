@@ -42,6 +42,7 @@ def calculate_budget():
         adults = int(data['members']['adults'])
         children = int(data['members']['children'])
         days = int(data.get('days', 1))
+        total_members = adults + children
         
         response = co.generate(
             model='command',
@@ -83,6 +84,18 @@ def calculate_budget():
         cost_data['cost_breakdown']['meals'] = clean_number(cost_data['cost_breakdown']['meals'])
         cost_data['cost_breakdown']['hotel'] = clean_number(cost_data['cost_breakdown']['hotel'])
         
+        # Add structured cost estimation
+        food_cost = 50 * total_members * days  # Assuming $50 per person per day
+        transport_cost = 20 * total_members * days  # Assuming $20 per person per day
+        misc_cost = 0.2 * (cost_data['estimated_cost'] + food_cost + transport_cost)  # 20% extra for miscellaneous expenses
+        
+        total_budget = cost_data['estimated_cost'] + food_cost + transport_cost + misc_cost
+        
+        cost_data['final_budget'] = total_budget
+        cost_data['cost_breakdown']['food'] = food_cost
+        cost_data['cost_breakdown']['transport'] = transport_cost
+        cost_data['cost_breakdown']['miscellaneous'] = misc_cost
+        
         validate(instance=cost_data, schema=BUDGET_SCHEMA)
         
         return jsonify({
@@ -96,6 +109,7 @@ def calculate_budget():
     except Exception as e:
         print("Other Error:", str(e))  # Debug: Print other errors
         return jsonify({'error': str(e)}), 400
+
     
 @app.route('/geocode', methods=['POST'])
 def geocode_location():
