@@ -1,6 +1,5 @@
-// HeroSection Component (updated)
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useUser } from "../context/UserContext";
 
 const HeroSection = () => {
@@ -9,20 +8,23 @@ const HeroSection = () => {
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
+  const [destinations, setDestinations] = useState<string[]>([]);
   const { userId } = useUser(); 
 
-  const destinations = [
-    "Delhi",
-    "Mumbai",
-    "Jaipur",
-    "Goa",
-    "Manali",
-    "Kerala",
-    "Kashmir",
-    "Rajasthan",
-    "Varanasi",
-    "Chennai",
-  ];
+  // Fetch destinations from backend
+  useEffect(() => {
+    const fetchDestinations = async () => {
+      try {
+        const response = await fetch("http://localhost:3001/api/destinations");
+        const data = await response.json();
+        setDestinations(data.destinations);
+      } catch (error) {
+        console.error("Error fetching destinations:", error);
+      }
+    };
+
+    fetchDestinations();
+  }, []);
 
   const handleDateChange = (start: string | null, end: string | null) => {
     if (start && end) {
@@ -42,7 +44,6 @@ const HeroSection = () => {
       return;
     }
 
-    // Prepare trip data to send to the API
     const tripData = {
       tripType,
       destination,
@@ -55,14 +56,11 @@ const HeroSection = () => {
     try {
       const response = await fetch("http://localhost:3001/api/create-trip", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(tripData),
       });
 
       const data = await response.json();
-
       if (response.ok) {
         alert(`Trip created successfully: ${JSON.stringify(data.trip)}`);
       } else {
@@ -78,6 +76,7 @@ const HeroSection = () => {
       <div className="p-4 relative z-10 w-full text-center">
         <h1 className="text-4xl font-bold text-white mt-10">Plan Your Trip</h1>
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6 px-4">
+          
           {/* Trip Type Card */}
           <div className="bg-white shadow-md rounded-lg p-6">
             <h2 className="text-2xl font-semibold mb-4">Select Trip Type</h2>
@@ -102,13 +101,9 @@ const HeroSection = () => {
               onChange={(e) => setDestination(e.target.value)}
               className="w-full p-2 border rounded-md"
             >
-              <option value="" disabled>
-                Choose a destination
-              </option>
+              <option value="" disabled>Choose a destination</option>
               {destinations.map((dest) => (
-                <option key={dest} value={dest}>
-                  {dest}
-                </option>
+                <option key={dest} value={dest}>{dest}</option>
               ))}
             </select>
           </div>
