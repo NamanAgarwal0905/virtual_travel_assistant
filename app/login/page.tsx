@@ -31,7 +31,7 @@ const LoginPage: React.FC = () => {
         });
         localStorage.setItem("authToken", token);
         localStorage.setItem("refreshToken", refreshToken);
-        localStorage.setItem("userName", email); 
+        localStorage.setItem("userEmail", email); 
         router.push(`/UserPage/${email}`);
       } else {
         toast.error("Login failed: Invalid response", {

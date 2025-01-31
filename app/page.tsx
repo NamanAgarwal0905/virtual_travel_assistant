@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-
+import { UserProvider } from "./context/UserContext";
 export default function Home() {
   const router = useRouter();
 
@@ -8,6 +8,7 @@ export default function Home() {
     router.push("/login");
   };
   return (
+    <UserProvider>
     <div style={styles.container}>
       {/* Hero Section with background */}
 
@@ -17,6 +18,7 @@ export default function Home() {
         <button style={styles.button} onClick={handleBookNow}>Book Now</button>
       </div>
     </div>
+    </UserProvider>
   );
 }
 

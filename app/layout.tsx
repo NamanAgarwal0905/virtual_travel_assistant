@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { UserProvider } from "./context/UserContext";
 import "./globals.css";
 import Navbar from "../components/Navbar";
 import HeroSection from "./home/page"
@@ -24,6 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    <UserProvider>
     <html lang="en" className="dark">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-900`}
@@ -32,5 +34,6 @@ export default function RootLayout({
         {children}
       </body>
     </html>
+    </UserProvider>
   );
 }

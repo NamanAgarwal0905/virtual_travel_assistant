@@ -1,6 +1,8 @@
+// HeroSection Component (updated)
 "use client";
 import React, { useState } from "react";
 import { useUser } from "../context/UserContext";
+
 const HeroSection = () => {
   const [tripType, setTripType] = useState<string | null>(null);
   const [destination, setDestination] = useState<string | null>(null);
@@ -8,6 +10,7 @@ const HeroSection = () => {
   const [endDate, setEndDate] = useState<string | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
   const { userId } = useUser(); 
+
   const destinations = [
     "Delhi",
     "Mumbai",
@@ -33,15 +36,41 @@ const HeroSection = () => {
     }
   };
 
-  const handleSubmit = () => {
-    console.log("Trip Type:", tripType);
-    console.log("Destination:", destination);
-    console.log("Start Date:", startDate);
-    console.log("End Date:", endDate);
-    console.log("Duration:", duration);
-    alert(
-      `Your trip is planned as:\nTrip Type: ${tripType}\nDestination: ${destination}\nStart Date: ${startDate}\nEnd Date: ${endDate}\nDuration: ${duration} days`
-    );
+  const handleSubmit = async () => {
+    if (!tripType || !destination || !startDate || !endDate || !duration) {
+      alert("Please fill in all the fields.");
+      return;
+    }
+
+    // Prepare trip data to send to the API
+    const tripData = {
+      tripType,
+      destination,
+      startDate,
+      endDate,
+      duration,
+      userId,
+    };
+
+    try {
+      const response = await fetch("http://localhost:3001/api/create-trip", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(tripData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(`Trip created successfully: ${JSON.stringify(data.trip)}`);
+      } else {
+        alert(`Error creating trip: ${data.message}`);
+      }
+    } catch (error) {
+      alert("Error submitting the trip data.");
+    }
   };
 
   return (
@@ -57,9 +86,7 @@ const HeroSection = () => {
                 <button
                   key={type}
                   onClick={() => setTripType(type)}
-                  className={`px-4 py-2 rounded-md ${
-                    tripType === type ? "bg-blue-500 text-white" : "bg-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-md ${tripType === type ? "bg-blue-500 text-white" : "bg-gray-200"}`}
                 >
                   {type}
                 </button>
