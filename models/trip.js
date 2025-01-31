@@ -9,18 +9,6 @@ const tripSchema = new mongoose.Schema(
     },
     destination: {
       type: String,
-      enum: [
-        "Delhi",
-        "Mumbai",
-        "Jaipur",
-        "Goa",
-        "Manali",
-        "Kerala",
-        "Kashmir",
-        "Rajasthan",
-        "Varanasi",
-        "Chennai",
-      ],
       required: true,
     },
     startDate: {
