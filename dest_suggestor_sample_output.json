@@ -1,0 +1,48 @@
+{
+    "status_code": 200,
+    "response": {
+        "festival_recommendations": [
+            {
+                "date": "2025-02-22",
+                "location": "Las Vegas, United States Of America",
+                "name": "Eagles Live at Sphere",
+                "url": "https://www.ticketmaster.com/eagles-live-at-sphere-las-vegas-nevada-02-22-2025/event/17006130495885A6"
+            },
+            {
+                "date": "2025-02-14",
+                "location": "Las Vegas, United States Of America",
+                "name": "Eagles Live at Sphere",
+                "url": "https://www.ticketmaster.com/eagles-live-at-sphere-las-vegas-nevada-02-14-2025/event/17006130496585A8"
+            }
+        ],
+        "provided_trips": [
+            {
+                "destination": "New York",
+                "duration": "5 days",
+                "tags": []
+            },
+            {
+                "destination": "California",
+                "duration": "7 days",
+                "tags": []
+            }
+        ],
+        "user_based_recommendations": [
+            {
+                "city": "Barcelona",
+                "country": "Spain",
+                "tags": "beaches architecture nightlife"
+            },
+            {
+                "city": "Amsterdam",
+                "country": "Netherlands",
+                "tags": "canals museums cycling"
+            },
+            {
+                "city": "Kyoto",
+                "country": "Japan",
+                "tags": "temples gardens traditional"
+            }
+        ]
+    }
+}
