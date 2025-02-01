@@ -1,11 +1,13 @@
-
 from flask import Flask, jsonify, request
 import requests
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
-from sklearn.neighbors import NearestNeighbors
+import tensorflow as tf
+from tensorflow.keras.layers import Dense, Input
+from tensorflow.keras.models import Model, model_from_json
 from sklearn.feature_extraction.text import TfidfVectorizer
-import joblib
+import json
 import os
 
 app = Flask(__name__)
@@ -13,8 +15,9 @@ app = Flask(__name__)
 destinations = pd.read_csv('destinations.csv')
 TICKETMASTER_API_KEY = os.getenv('TICKETMASTER_API_KEY')
 
-MODEL_PATH = 'models/recommender_model.pkl'
-VECTORIZER_PATH = 'models/tfidf_vectorizer.pkl'
+MODEL_PATH = 'models/recommender_model.json'
+WEIGHTS_PATH = 'models/recommender.weights.h5'
+VECTORIZER_PATH = 'models/tfidf_vectorizer.json'
 
 def get_upcoming_events():
     params = {
@@ -29,7 +32,6 @@ def get_upcoming_events():
         response = requests.get("https://app.ticketmaster.com/discovery/v2/events.json", params=params)
         response.raise_for_status()
         
-        # Check if response contains events
         data = response.json()
         if '_embedded' not in data or 'events' not in data['_embedded']:
             print("No events found in the response")
@@ -52,12 +54,42 @@ def get_upcoming_events():
     except Exception as e:
         print(f"Unexpected error fetching events: {e}")
         return []
+
+def save_vectorizer(vectorizer, path):
+    """Save TfidfVectorizer to JSON"""
+    vectorizer_params = {
+        'vocabulary_': vectorizer.vocabulary_,
+        'idf_': vectorizer.idf_.tolist(),
+        'stop_words_': list(vectorizer.stop_words) if vectorizer.stop_words else None
+    }
+    with open(path, 'w') as f:
+        json.dump(vectorizer_params, f)
+
+def load_vectorizer(path):
+    """Load TfidfVectorizer from JSON"""
+    with open(path, 'r') as f:
+        params = json.load(f)
     
+    vectorizer = TfidfVectorizer(stop_words='english')
+    vectorizer.vocabulary_ = params['vocabulary_']
+    vectorizer.idf_ = np.array(params['idf_'])
+    vectorizer.stop_words_ = set(params['stop_words_']) if params['stop_words_'] else None
+    return vectorizer
+
 def load_recommender_model():
     """Load pre-trained recommendation model"""
     try:
-        model = joblib.load(MODEL_PATH)
-        vectorizer = joblib.load(VECTORIZER_PATH)
+        # Load model architecture
+        with open(MODEL_PATH, 'r') as f:
+            model_json = f.read()
+        model = model_from_json(model_json)
+        
+        # Load model weights
+        model.load_weights(WEIGHTS_PATH)
+        
+        # Load vectorizer
+        vectorizer = load_vectorizer(VECTORIZER_PATH)
+        
         return model, vectorizer
     except Exception as e:
         print(f"Error loading model: {e}")
@@ -71,11 +103,25 @@ def recommend_based_on_history(past_trips):
     
     # Vectorize user's trip history
     trip_descriptions = [' '.join(trip['tags']) for trip in past_trips]
-    user_vector = vectorizer.transform([' '.join(trip_descriptions)])
+    user_vector = vectorizer.transform([' '.join(trip_descriptions)]).toarray()
     
-    # Find similar destinations
-    distances, indices = model.kneighbors(user_vector)
-    recommended = destinations.iloc[indices[0]][:3]
+    # Get embeddings for all destinations
+    all_destinations = vectorizer.transform(destinations['tags']).toarray()
+    
+    # Get similarity scores
+    user_embedding = model.predict(user_vector)
+    destination_embeddings = model.predict(all_destinations)
+    
+    # Calculate cosine similarity
+    similarities = tf.keras.losses.cosine_similarity(
+        tf.expand_dims(user_embedding[0], 0),
+        destination_embeddings
+    )
+    
+    # Get top 3 recommendations
+    top_indices = tf.argsort(similarities)[:3].numpy()
+    recommended = destinations.iloc[top_indices]
+    
     return recommended.to_dict('records')
 
 @app.route('/recommendations', methods=['POST'])
@@ -100,15 +146,37 @@ def get_recommendations():
     })
 
 def train_model():
-    """Train and save the recommendation model"""
+    """Train and save the recommendation model using TensorFlow/Keras"""
     tfidf = TfidfVectorizer(stop_words='english')
-    features = tfidf.fit_transform(destinations['tags'])
+    features = tfidf.fit_transform(destinations['tags']).toarray()
+    input_dim = features.shape[1]
     
-    model = NearestNeighbors(n_neighbors=5, metric='cosine')
-    model.fit(features)
+    inputs = Input(shape=(input_dim,))
+    encoded = Dense(256, activation='relu')(inputs)
+    encoded = Dense(128, activation='relu')(encoded)
+    encoded = Dense(64, activation='relu')(encoded)
+    decoded = Dense(32, activation='relu')(encoded)
+    decoded = Dense(input_dim, activation='sigmoid')(decoded)
     
-    joblib.dump(model, MODEL_PATH)
-    joblib.dump(tfidf, VECTORIZER_PATH)
+    model = Model(inputs=inputs, outputs=decoded)
+    model.compile(optimizer='adam', loss='mse')
+    
+    model.fit(
+        features,
+        features,
+        epochs=50,
+        batch_size=32,
+        shuffle=True,
+        validation_split=0.2
+    )
+    
+    model_json = model.to_json()
+    with open(MODEL_PATH, 'w') as f:
+        f.write(model_json)
+    
+    model.save_weights(WEIGHTS_PATH)
+
+    save_vectorizer(tfidf, VECTORIZER_PATH)
 
 if __name__ == '__main__':
     if not os.path.exists(MODEL_PATH):
