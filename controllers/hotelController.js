@@ -84,6 +84,7 @@ async function getHotelDescription(hotel_id) {
 async function processHotels(destination) {
     try {
       const dest = destination.body.destination;
+      console.log(dest)
       const city_code = cityMapping[dest];
   
       if (!city_code) {
