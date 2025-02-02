@@ -14,56 +14,36 @@ interface Trip {
 const HomePage: React.FC = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const router = useRouter();
-  const { username } = useUser();
-
+  const { username ,userId} = useUser();
   useEffect(() => {
+    console.log(userId)
     const fetchTrips = async () => {
+      if (!userId) return; // Ensure userId is available
+  
       try {
-        // Fetch geocode information
-        const geocodeResponse = await fetch(
-          "https://api.geoapify.com/v1/geocode/search?text=38%20Upper%20Montagu%20Street%2C%20Westminster%20W1H%201LJ%2C%20United%20Kingdom&apiKey=2b1b2ce8aac54a59938f8c1e0776e07b"
-        );
-        const geocodeData = await geocodeResponse.json();
-        console.log("Geocode Query:", geocodeData.query.text);
-
-        if (!geocodeData.features || geocodeData.features.length === 0) {
-          console.error("No location data found");
-          return;
+        const response = await fetch("http://localhost:3001/api/recommendations/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ userId }),
+        });
+  
+        if (!response.ok) {
+          throw new Error("Failed to fetch recommended destinations");
         }
-
-        // Extract district and country
-        const location = geocodeData.features[0].properties;
-        const district = location.district || "westminster";
-        const country = location.country || "united kingdom";
-
-        console.log(`Fetching destinations for: ${district}, ${country}`);
-
-        // Fetch tourist attractions
-        const placesResponse = await fetch(
-          `https://api.geoapify.com/v2/places?categories=tourism&filter=place:${district},${country}&limit=6&apiKey=2b1b2ce8aac54a59938f8c1e0776e07b`
-        );
-        const placesData = await placesResponse.json();
-
-        if (!placesData.features || placesData.features.length === 0) {
-          console.error("No tourist attractions found");
-          return;
-        }
-
-        // Extract relevant destination data
-        const tripsData = placesData.features.map((place: any) => ({
-          name: place.properties.name || "Unknown Destination",
-          category: place.properties.categories?.join(", ") || "No category available",
-          image: place.properties.image, // Only use if provided
-        }));
-
-        setTrips(tripsData);
+        console.log(response)
+        const data = await response.json();
+        setTrips(data.recommendations); // Update state with recommended trips
       } catch (error) {
         console.error("Error fetching trips:", error);
       }
     };
-
+  
     fetchTrips();
-  }, []);
+  }, [userId]);
+  
+  
 
   return (
     <div className="min-h-screen bg-gray-100 p-6 flex flex-col relative">
@@ -73,6 +53,12 @@ const HomePage: React.FC = () => {
           onClick={() => router.push("/my-trips")}
         >
           My Trips
+        </button>
+        <button
+          className="bg-purple-600 text-white mx-4 py-2 rounded-lg shadow-md px-2 hover:bg-purple-500"
+          onClick={() => router.push("/ongoing-trips")}
+        >
+          Ongoing Trips
         </button>
       </div>
       <h1 className="text-4xl font-bold text-center mt-6">Hello, {username}!</h1>
